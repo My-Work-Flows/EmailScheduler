@@ -25,12 +25,13 @@ jobs:
       - name: Determine target hour
         id: context
         run: |
+          echo "🕓 Detecting hour..."
           if [ "${{ github.event.inputs.simulated_hour }}" != "" ]; then
             HOUR="${{ github.event.inputs.simulated_hour }}"
-            echo "Using simulated hour: $HOUR"
+            echo "✅ Manual trigger with simulated hour: $HOUR"
           else
             HOUR=$(TZ="Asia/Kolkata" date +'%H')
-            echo "Using current IST hour: $HOUR"
+            echo "🕒 Scheduled trigger. Current IST hour: $HOUR"
           fi
 
           case "$HOUR" in
@@ -40,10 +41,13 @@ jobs:
             "19") FILE="evening.html"; SUBJECT="Good Evening 🌆";;
             "22") FILE="night.html"; SUBJECT="Good Night 🌙";;
             *)
-              echo "Invalid hour: $HOUR. No email will be sent."
+              echo "❌ Invalid hour: $HOUR. No email will be sent."
               exit 1
               ;;
           esac
+
+          echo "📄 HTML file: emails/$FILE"
+          echo "✉️ Subject: $SUBJECT"
 
           echo "file=$FILE" >> $GITHUB_OUTPUT
           echo "subject=$SUBJECT" >> $GITHUB_OUTPUT
@@ -64,6 +68,11 @@ jobs:
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
+          echo "🚀 Starting email sender..."
+          echo "🔐 From: $EMAIL_SENDER"
+          echo "📧 To: $EMAIL_RECIPIENTS"
+          echo "📁 HTML File: emails/${{ steps.context.outputs.file }}"
+          echo "🏷️ Subject: ${{ steps.context.outputs.subject }}"
           python email_sender.py \
             "${{ steps.context.outputs.subject }}" \
             "emails/${{ steps.context.outputs.file }}"
