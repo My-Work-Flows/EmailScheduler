@@ -2,32 +2,49 @@ name: Scheduled Email Sender
 
 on:
   schedule:
-    # Times are in UTC
     - cron: '30 3 * * *'    # 9:00 AM IST
     - cron: '30 6 * * *'    # 12:00 PM IST
     - cron: '30 10 * * *'   # 4:00 PM IST
     - cron: '30 13 * * *'   # 7:00 PM IST
     - cron: '30 16 * * *'   # 10:00 PM IST
+  workflow_dispatch:
+    inputs:
+      simulated_hour:
+        description: 'Simulate IST hour (e.g., 09, 12, 16, 19, 22)'
+        required: false
+        default: ''
 
 jobs:
   send_email:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set email subject and file based on time
+      - name: Determine target hour
         id: context
         run: |
-          HOUR=$(TZ="Asia/Kolkata" date +'%H')
+          if [ "${{ github.event.inputs.simulated_hour }}" != "" ]; then
+            HOUR="${{ github.event.inputs.simulated_hour }}"
+            echo "Using simulated hour: $HOUR"
+          else
+            HOUR=$(TZ="Asia/Kolkata" date +'%H')
+            echo "Using current IST hour: $HOUR"
+          fi
+
           case "$HOUR" in
             "09") FILE="morning.html"; SUBJECT="Good Morning ☀️";;
             "12") FILE="noon.html"; SUBJECT="Good Noon ☀️";;
             "16") FILE="afternoon.html"; SUBJECT="Good Afternoon 🌤️";;
             "19") FILE="evening.html"; SUBJECT="Good Evening 🌆";;
             "22") FILE="night.html"; SUBJECT="Good Night 🌙";;
-            *) echo "Time does not match any expected slot. Skipping."; exit 1;;
+            *)
+              echo "Invalid hour: $HOUR. No email will be sent."
+              exit 1
+              ;;
           esac
+
           echo "file=$FILE" >> $GITHUB_OUTPUT
           echo "subject=$SUBJECT" >> $GITHUB_OUTPUT
 
@@ -48,5 +65,5 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
           python email_sender.py \
-            "$(echo '${{ steps.context.outputs.subject }}')" \
+            "${{ steps.context.outputs.subject }}" \
             "emails/${{ steps.context.outputs.file }}"
