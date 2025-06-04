@@ -1,0 +1,52 @@
+name: Scheduled Email Sender
+
+on:
+  schedule:
+    # Times are in UTC
+    - cron: '30 3 * * *'    # 9:00 AM IST
+    - cron: '30 6 * * *'    # 12:00 PM IST
+    - cron: '30 10 * * *'   # 4:00 PM IST
+    - cron: '30 13 * * *'   # 7:00 PM IST
+    - cron: '30 16 * * *'   # 10:00 PM IST
+
+jobs:
+  send_email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set email subject and file based on time
+        id: context
+        run: |
+          HOUR=$(TZ="Asia/Kolkata" date +'%H')
+          case "$HOUR" in
+            "09") FILE="morning.html"; SUBJECT="Good Morning ☀️";;
+            "12") FILE="noon.html"; SUBJECT="Good Noon ☀️";;
+            "16") FILE="afternoon.html"; SUBJECT="Good Afternoon 🌤️";;
+            "19") FILE="evening.html"; SUBJECT="Good Evening 🌆";;
+            "22") FILE="night.html"; SUBJECT="Good Night 🌙";;
+            *) echo "Time does not match any expected slot. Skipping."; exit 1;;
+          esac
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "subject=$SUBJECT" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install --upgrade pip
+
+      - name: Send Email
+        env:
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+        run: |
+          python email_sender.py \
+            "$(echo '${{ steps.context.outputs.subject }}')" \
+            "emails/${{ steps.context.outputs.file }}"
